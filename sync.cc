@@ -37,7 +37,7 @@ NAN_METHOD(syncRun) {
 
 	pclose(fp);
 
-	NanReturnValue(String::New(result.c_str()));
+	NanReturnValue(NanNew<String>(result.c_str()));
 }
 
 void init(Handle<Object> exports, Handle<Object> module) {

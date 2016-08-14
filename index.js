@@ -1,15 +1,10 @@
-var sync = require('bindings')('sync.node');
+var execSync = require('child_process').execSync;
+var fs = require('fs');
+var temp = require('temp-fs');
 var path = require('path');
 var JSONB = require('json-buffer');
 
 module.exports = function (filePath, args) {
-
-	var jsonArgs,
-		workerPath,
-		completeResult,
-		resultSplitted,
-		lastResult,
-		jsonResult;
 
 	if (args === undefined) {
 		args = [];
@@ -19,31 +14,44 @@ module.exports = function (filePath, args) {
 		throw new Error('Arguments should be an array.');
 	}
 
-	// Prepare
-	jsonArgs = JSONB.stringify(args);
-	jsonArgs = new Buffer(jsonArgs, 'utf8');
-	jsonArgs = jsonArgs.toString('base64');
+	var content = null;
+	var result = null;
+	var error = false;
 
-	workerPath = path.join(__dirname, 'lib', 'worker.js');
-
-	// Execute synchronously
-	completeResult = sync('node "' + workerPath + '" "' + filePath + '" "' + jsonArgs + '"');
-
-	// Parse result output - last one should be the real result
-	resultSplitted = completeResult.split("$-------------$");
-	lastResult = resultSplitted[resultSplitted.length - 1].trim();
-
-	// Error?
-	if (lastResult[0] === 'E') {
-		throw new Error(lastResult.slice(1));
-	}
+	var inputFile = temp.name();
+	var outputFile = temp.name();
 
 	try {
-		jsonResult = JSONB.parse(lastResult.slice(1));
+
+		// Prepare
+		fs.writeFileSync(inputFile, JSONB.stringify(args), {encoding: 'utf8'});
+		var workerPath = path.join(__dirname, 'lib', 'worker.js');
+
+		// Execute synchronously
+		execSync('node "' + workerPath + '" "' + filePath + '" "' + inputFile + '" "' + outputFile + '"').toString();
+
 	} catch (err) {
-		throw new Error(err.message + ':' + completeResult);
+		error = true;
+
+	} finally {
+
+		if (fs.existsSync(inputFile)) {
+			content = fs.readFileSync(outputFile, {encoding: 'utf8'});
+		}
+		result = JSONB.parse(content);
+
+		if (fs.existsSync(inputFile)) {
+			fs.unlinkSync(inputFile);
+		}
+		if (fs.existsSync(outputFile)) {
+			fs.unlinkSync(outputFile);
+		}
 	}
 
-	return jsonResult;
+	if (error) {
+		throw result;
+	}
+
+	return result;
 };
 

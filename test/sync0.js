@@ -1,10 +1,8 @@
 var Promise = require('promise');
 
-module.exports = function (a, b, text) {
-
-	console.log(text);
+module.exports = function () {
 
 	return new Promise(function (resolve, reject) {
-		resolve(a * 5 * b);
+		resolve(0);
 	});
 };
